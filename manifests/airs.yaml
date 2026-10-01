@@ -1,0 +1,57 @@
+# mock-airs: stand-in for Prisma AIRS API Intercept. Delete this block and point
+# airs-adapter's AIRS_URL at https://service.api.aisecurity.paloaltonetworks.com to go live.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: mock-airs, namespace: prisma-airs}
+spec:
+  selector: {matchLabels: {app: mock-airs}}
+  template:
+    metadata: {labels: {app: mock-airs}}
+    spec:
+      containers:
+      - name: mock-airs
+        image: python:3.12-slim
+        command: ["python3", "-u", "/app/mock-airs.py"]
+        env:
+        - {name: MOCK_AIRS_TOKEN, valueFrom: {secretKeyRef: {name: airs-api-key, key: token}}}
+        ports: [{containerPort: 8080}]
+        readinessProbe: {httpGet: {path: /, port: 8080}, periodSeconds: 2}
+        volumeMounts: [{name: app, mountPath: /app}]
+      volumes: [{name: app, configMap: {name: airs-code}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: mock-airs, namespace: prisma-airs}
+spec:
+  selector: {app: mock-airs}
+  ports: [{port: 80, targetPort: 8080}]
+---
+# airs-adapter: agentgateway Guardrail Webhook API -> Prisma AIRS scan API.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: airs-adapter, namespace: prisma-airs}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: airs-adapter}}
+  template:
+    metadata: {labels: {app: airs-adapter}}
+    spec:
+      containers:
+      - name: airs-adapter
+        image: python:3.12-slim
+        command: ["python3", "-u", "/app/airs-adapter.py"]
+        env:
+        - {name: AIRS_URL, value: "http://mock-airs.prisma-airs.svc.cluster.local"}
+        - {name: AIRS_PROFILE, value: "agentgateway-default"}
+        - {name: AIRS_API_KEY, valueFrom: {secretKeyRef: {name: airs-api-key, key: token}}}
+        ports: [{containerPort: 8000}]
+        readinessProbe: {httpGet: {path: /, port: 8000}, periodSeconds: 2}
+        volumeMounts: [{name: app, mountPath: /app}]
+      volumes: [{name: app, configMap: {name: airs-code}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: airs-adapter, namespace: prisma-airs}
+spec:
+  selector: {app: airs-adapter}
+  ports: [{port: 8000, targetPort: 8000, appProtocol: http}]

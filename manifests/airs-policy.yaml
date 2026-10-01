@@ -1,0 +1,27 @@
+# The integration itself: every prompt and every response on the route is scanned
+# by Prisma AIRS through the adapter. FailClosed: if AIRS is down, nothing reaches the LLM.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata: {name: allow-agentgateway-to-airs-adapter, namespace: prisma-airs}
+spec:
+  from: [{group: enterpriseagentgateway.solo.io, kind: EnterpriseAgentgatewayPolicy, namespace: agentgateway-system}]
+  to: [{group: "", kind: Service, name: airs-adapter}]
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata: {name: prisma-airs-guard, namespace: agentgateway-system}
+spec:
+  targetRefs:
+  - {group: gateway.networking.k8s.io, kind: HTTPRoute, name: anthropic}
+  backend:
+    ai:
+      promptGuard:
+        request:
+        - webhook:
+            backendRef: {kind: Service, name: airs-adapter, namespace: prisma-airs, port: 8000}
+            forwardHeaderMatches: [{name: x-user-id, type: RegularExpression, value: ".*"}]
+            failureMode: FailClosed
+        response:
+        - webhook:
+            backendRef: {kind: Service, name: airs-adapter, namespace: prisma-airs, port: 8000}
+            failureMode: FailClosed
