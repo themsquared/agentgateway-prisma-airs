@@ -18,6 +18,7 @@ client -> agentgateway --(promptGuard webhook)--> airs-adapter --(x-pan-token)--
   Crude regex detection (injection phrases, SSN, card numbers, bad URLs).
 - `manifests/airs-policy.yaml`: the integration itself, one `EnterpriseAgentgatewayPolicy`.
 - `up.sh` / `test.sh`: build a kind cluster, then run the five checks.
+- `demo.sh` / `demo_fmt.py`: the step-by-step live demo (see below).
 
 ## Run
 Needs kind, kubectl, helm, an Anthropic API key, and a Solo Enterprise for agentgateway license.
@@ -28,6 +29,23 @@ Needs kind, kubectl, helm, an Anthropic API key, and a Solo Enterprise for agent
     ./test.sh
 
 Tear down: `kind delete cluster --name airs-poc`
+
+## Live demo
+`demo.sh` walks an audience through the integration one step at a time (press Enter to advance):
+
+1. The gateway policy that wires in Prisma AIRS
+2. A normal prompt: allowed and answered
+3. A prompt injection: blocked with a 403, the model is never called
+4. An SSN in the prompt: masked before the model sees it
+5. A card number in the model's answer: masked before the client sees it
+6. The audit trail: each prompt scan carries the calling user
+7. AIRS taken down: the gateway fails closed, then AIRS is restored
+
+Each step shows the request, what the client got back, and the AIRS verdict behind it.
+
+    ./demo.sh                 # interactive
+    DEMO_AUTO=1 ./demo.sh     # run straight through
+    PORT=18999 ./demo.sh      # if the default local port (18765) is taken
 
 ## Go live against real Prisma AIRS
 1. In Strata Cloud Manager, onboard an API Intercept app and create a security profile. Get the API key.

@@ -68,7 +68,7 @@ class H(BaseHTTPRequestHandler):
                 resp["response_masked_data"] = {"data": data, "pattern_detections": pd}
         if any((resp.get("prompt_detected") or {}).values()) or any((resp.get("response_detected") or {}).values()):
             resp["category"], resp["action"] = "malicious", "block"
-        print(json.dumps({"scan": req.get("tr_id"), "profile": resp["profile_name"], "action": resp["action"],
+        print(json.dumps({"scan": req.get("tr_id"), "profile": resp["profile_name"], "app_user": (req.get("metadata") or {}).get("app_user"), "action": resp["action"],
                           "prompt_detected": resp.get("prompt_detected"), "response_detected": resp.get("response_detected")}), flush=True)
         self._send(200, resp)
 
